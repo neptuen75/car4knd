@@ -85,6 +85,10 @@ h1{font-size:clamp(22px,3.5vw,32px);font-weight:700;color:#fff;letter-spacing:-.
 .btn-submit{font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 28px;border-radius:8px;cursor:pointer;border:none;background:var(--header-bg);color:#fff;display:flex;align-items:center;gap:7px;transition:all .2s;box-shadow:0 2px 6px rgba(30,58,95,.3)}
 .btn-submit:hover{background:#234d8a;transform:translateY(-1px)}
 .btn-submit:active{transform:none}
+.btn-submit-save{font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 22px;border-radius:8px;cursor:pointer;border:none;background:var(--success);color:#fff;display:flex;align-items:center;gap:7px;transition:all .2s;box-shadow:0 2px 6px rgba(22,163,74,.3)}
+.btn-submit-save:hover{background:#15803d;transform:translateY(-1px)}
+.btn-submit-save:active{transform:none}
+.btn-submit-save:disabled{opacity:.45;cursor:not-allowed;transform:none}
 .btn-form-reset{font-family:var(--sans);font-size:13px;font-weight:500;padding:10px 18px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:#fff;color:var(--text-sub);display:flex;align-items:center;gap:6px;transition:all .15s}
 .btn-form-reset:hover{background:#f4f7fb}
 
@@ -296,6 +300,10 @@ tbody td.td-left{text-align:left}
         <svg style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         <span id="submitLabel">등록하기</span>
       </button>
+      <button class="btn-submit-save" id="btnSubmitSave" onclick="submitAndSave()">
+        <svg style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        등록 + Sheets 저장
+      </button>
     </div>
   </div>
 
@@ -447,7 +455,56 @@ function submitForm() {
   renderTable(currentMonth);
 }
 
-function resetForm() {
+function submitAndSave() {
+  if (!SCRIPT_URL) {
+    toast('Google Sheets가 연결되지 않았습니다. 먼저 URL을 연결해 주세요.', true);
+    document.getElementById('setupBanner').classList.remove('hidden');
+    return;
+  }
+  // 먼저 등록
+  var date = document.getElementById('fDate').value;
+  var mgr  = document.getElementById('fMgr').value.trim();
+  var site = document.getElementById('fSite').value.trim();
+  if (!date) { toast('일자를 입력해 주세요.', true); document.getElementById('fDate').focus(); return; }
+  if (!mgr)  { toast('현장담당자를 입력해 주세요.', true); document.getElementById('fMgr').focus(); return; }
+  if (!site) { toast('현장명을 입력해 주세요.', true); document.getElementById('fSite').focus(); return; }
+
+  var obj = {
+    date:   date, mgr: mgr, site: site,
+    loc:    document.getElementById('fLoc').value.trim(),
+    vtype:  document.getElementById('fVtype').value,
+    pallet: document.getElementById('fPallet').value,
+    veh:    document.getElementById('fVeh').value,
+    note:   document.getElementById('fNote').value.trim(),
+    write_date: document.getElementById('writeDate').value,
+    writer:     document.getElementById('writer').value,
+    dept:       document.getElementById('dept').value,
+    phone:      document.getElementById('phone').value
+  };
+
+  if (editIdx >= 0) {
+    allRows[editIdx] = obj;
+  } else {
+    allRows.unshift(obj);
+  }
+  resetForm();
+  buildMonthTabs();
+  renderTable(currentMonth);
+
+  // 이어서 Sheets 저장
+  var btn = document.getElementById('btnSubmitSave');
+  btn.disabled = true;
+  setBadge('저장 중…', 'syncing');
+  saveData(collectData(), function(res) {
+    btn.disabled = false;
+    setBadge('저장 완료 ✓', 'ok');
+    toast('✅ 등록 + Google Sheets 저장 완료! (' + (res.saved||0) + '건)');
+  }, function(err) {
+    btn.disabled = false;
+    setBadge('저장 실패', 'error');
+    toast('❌ 등록은 완료됐지만 Sheets 저장 실패: ' + err, true);
+  });
+}
   editIdx = -1;
   ['fDate','fMgr','fSite','fLoc','fPallet','fVeh','fNote'].forEach(function(id){ document.getElementById(id).value = ''; });
   document.getElementById('fVtype').value = '선택';
@@ -718,6 +775,7 @@ function disconnectScript() {
 function enableButtons(on) {
   document.getElementById('btnSave').disabled = !on;
   document.getElementById('btnLoad').disabled = !on;
+  document.getElementById('btnSubmitSave').disabled = !on;
   document.getElementById('btnDisconnect').style.display = on ? 'inline-flex' : 'none';
   document.getElementById('sheetsLink').style.display    = on ? 'flex' : 'none';
 }
